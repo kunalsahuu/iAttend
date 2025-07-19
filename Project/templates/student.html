@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: linear-gradient(to right, #f8f9fa, #e0eafc);
+            font-family: 'Poppins', sans-serif;
+        }
+        h2, h4, h5 {
+            font-weight: 600;
+        }
+        .table thead th {
+            background-color: #198754;
+            color: white;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        .card-header {
+            border-top-left-radius: 1rem;
+            border-top-right-radius: 1rem;
+        }
+        .btn-success {
+            border-radius: 30px;
+            padding: 10px 20px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 128, 0, 0.2);
+        }
+        .summary-table td, .summary-table th,
+        .table-striped td, .table-striped th {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .table-striped tbody tr:hover {
+            background-color: #e9f7ef;
+        }
+        .small-muted {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        .section-title {
+            margin-bottom: 1rem;
+            color: #343a40;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h2 class="text-center mb-5">📊 Student Attendance Dashboard</h2>
+
+        <!-- Top 5 Students -->
+        <div class="card shadow-sm mb-5 border-0 rounded-4">
+            <div class="card-header bg-white border-bottom rounded-top-4 px-4 py-3">
+                <h5 class="mb-0 text-dark fw-bold">🏆 Top 5 Students by Attendance</h5>
+                <p class="text-muted small mb-0">Based on total attendance across all subjects</p>
+            </div>
+            <div class="card-body px-0 py-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-borderless align-middle mb-0">
+                        <thead class="bg-light text-secondary text-uppercase small">
+                            <tr>
+                                <th scope="col" class="text-center">Rank</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Roll No</th>
+                                <th scope="col" class="text-center">Total Attendance</th>
+                                <th scope="col" class="text-center">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-dark">
+                            {% for student in top_5_students %}
+                            <tr>
+                                <td class="text-center fw-bold text-primary">{{ loop.index }}</td>
+                                <td class="fw-semibold">{{ student['Name'] }}</td>
+                                <td>{{ student['Roll No'] }}</td>
+                                <td class="text-center">{{ student['Total'] }}</td>
+                                <td class="text-center">
+                                    {% if student['Max Total'] %}
+                                        {{ (student['Total'] / student['Max Total'] * 100) | round(2) }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Summary Button -->
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{{ url_for('download_summary') }}" class="btn btn-success">📂 Download Summary CSV</a>
+        </div>
+
+        <!-- Subject-wise Summary -->
+        <div class="card mb-5">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">📚 Subject-wise Attendance Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered summary-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Roll No</th>
+                                {% for subject, max_count in subject_max_counts.items() %}
+                                    <th>{{ subject }}<div class="small-muted">(Total: {{ max_count }})</div></th>
+                                {% endfor %}
+                                <th>Total<br><span class="small-muted">(with %)</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in summary %}
+                                <tr>
+                                    <td>{{ row['Name'] }}</td>
+                                    <td>{{ row['Roll No'] }}</td>
+                                    {% for subject in subject_max_counts %}
+                                        <td>
+                                            {{ row.get(subject, 0) }}
+                                            {% if subject ~ ' %' in row %}
+                                                <div class="small-muted">({{ row[subject ~ ' %'] }}%)</div>
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                    <td>
+                                        {{ row['Total'] }}
+                                        {% if row['Max Total'] %}
+                                            <div class="small-muted">
+                                                ({{ (row['Total'] / row['Max Total'] * 100) | round(2) }}%)
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+       
+        <!-- Attendance Chart -->
+        <div class="card mt-5 mb-5">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">📈 Attendance Overview (per Student)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="attendanceChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js Bar Chart Script -->
+    <script>
+        const ctx = document.getElementById('attendanceChart').getContext('2d');
+
+        const chartData = {
+            labels: [{% for row in summary %}"{{ row['Name'] }}",{% endfor %}],
+            datasets: [
+                {% for subject in subject_max_counts %}
+                {
+                    label: '{{ subject }}',
+                    data: [{% for row in summary %}{{ row.get(subject, 0) }},{% endfor %}],
+                    backgroundColor: 'rgba({{ 100 + loop.index0 * 50 }}, {{ 99 + loop.index0 * 30 }}, 200, 0.6)',
+                    borderColor: 'rgba(0, 0, 0, 0.1)',
+                    borderWidth: 1
+                },
+                {% endfor %}
+            ]
+        };
+
+        const chartOptions = {
+            indexAxis: 'y',
+            responsive: true,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Classes Attended'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Students'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            }
+        };
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: chartOptions
+        });
+    </script>
+</body>
+ <!-- All Attendance Records -->
+ <h4 class="mb-3">🗓️ All Attendance Records</h4>
+ <div class="table-responsive">
+     <table class="table table-striped table-bordered">
+         <thead class="table-success">
+             <tr>
+                 <th>Name</th>
+                 <th>Roll No</th>
+                 <th>Time</th>
+                 <th>Date</th>
+                 <th>Subject</th>
+                 <th>Teacher</th>
+             </tr>
+         </thead>
+         <tbody>
+             {% for record in records %}
+                 <tr>
+                     <td>{{ record[0] }}</td>
+                     <td>{{ record[1] }}</td>
+                     <td>{{ record[2] }}</td>
+                     <td>{{ record[3] }}</td>
+                     <td>{{ record[4] }}</td>
+                     <td>{{ record[5] }}</td>
+                 </tr>
+             {% endfor %}
+         </tbody>
+     </table>
+ </div>
+
+</html>

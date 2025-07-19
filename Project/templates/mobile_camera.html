@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mobile Face Recognition</title>
+</head>
+<body>
+    <h2>Mobile Camera Face Recognition</h2>
+    <video id="video" width="320" height="240" autoplay></video>
+    <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+    <p id="status">Initializing camera...</p>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const statusText = document.getElementById('status');
+        const ctx = canvas.getContext('2d');
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                statusText.innerText = "Camera is active. Scanning for face...";
+                setInterval(captureFrame, 3000); // Every 3 seconds
+            })
+            .catch(err => {
+                statusText.innerText = "Camera error: " + err;
+            });
+
+        function captureFrame() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL('image/jpeg');
+
+            fetch('/process_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData })
+            })
+            .then(res => res.text())
+            .then(text => {
+                statusText.innerText = text;
+            })
+            .catch(err => {
+                statusText.innerText = "Error sending frame: " + err;
+            });
+        }
+    </script>
+</body>
+</html>
